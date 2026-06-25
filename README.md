@@ -1,0 +1,1 @@
+# softverski-agenti-2026
