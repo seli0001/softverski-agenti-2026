@@ -1,0 +1,7 @@
+# JetBrains / GoLand
+.idea/
+
+# Go build artifacts
+*.exe
+*.out
+/bin/
