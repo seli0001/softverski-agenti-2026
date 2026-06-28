@@ -9,6 +9,7 @@ type Context interface {
 	Send(to PID, msg any)
 	Watch(pid PID)
 	Become(behavior func(Context, any))
+	Spawn(producer func() Actor) PID
 }
 
 type actorContext struct {
@@ -30,6 +31,10 @@ func (c actorContext) Watch(pid PID) {
 
 func (c actorContext) Become(behavior func(Context, any)) {
 	c.sys.Become(c.self, behavior)
+}
+
+func (c actorContext) Spawn(producer func() Actor) PID {
+	return c.sys.SpawnChildren(c.self, producer)
 }
 
 type Started struct{}

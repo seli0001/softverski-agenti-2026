@@ -32,7 +32,7 @@ func onBehavior(ctx actors.Context, msg any) {
 
 func main() {
 	sys := actors.NewSystem()
-	lamp := sys.Spawn(Lamp{})
+	lamp := sys.Spawn(func() actors.Actor { return Lamp{} })
 
 	sys.Send(lamp, Toggle{})
 	sys.Send(lamp, Toggle{})

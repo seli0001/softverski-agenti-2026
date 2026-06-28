@@ -44,15 +44,21 @@ func (p Player) Receive(ctx actors.Context, msg any) {
 
 func main() {
 	sys := actors.NewSystem()
-	ping := sys.Spawn(Player{
-		name: "ping",
+	ping := sys.Spawn(func() actors.Actor {
+		return Player{
+			name: "ping",
+		}
 	})
-	pong := sys.Spawn(Player{
-		name: "pong",
+	pong := sys.Spawn(func() actors.Actor {
+		return Player{
+			name: "pong",
+		}
 	})
 
-	sys.Spawn(Watcher{
-		target: ping,
+	sys.Spawn(func() actors.Actor {
+		return Watcher{
+			target: ping,
+		}
 	})
 
 	sys.Send(ping, Ball{From: pong, counter: 6})
