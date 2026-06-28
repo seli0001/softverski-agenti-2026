@@ -11,6 +11,19 @@ type Ball struct {
 	counter int
 }
 
+type Watcher struct {
+	target actors.PID
+}
+
+func (w Watcher) Receive(ctx actors.Context, msg any) {
+	switch m := msg.(type) {
+	case actors.Started:
+		ctx.Watch(w.target)
+	case actors.Terminated:
+		fmt.Println("actor terminated", m.PID)
+	}
+}
+
 type Player struct {
 	name string
 }
@@ -36,6 +49,10 @@ func main() {
 	})
 	pong := sys.Spawn(Player{
 		name: "pong",
+	})
+
+	sys.Spawn(Watcher{
+		target: ping,
 	})
 
 	sys.Send(ping, Ball{From: pong, counter: 6})

@@ -7,6 +7,7 @@ import (
 
 type System struct {
 	mailboxes map[PID]*Mailbox
+	watchers  map[PID][]PID
 	counter   int
 	mu        sync.Mutex
 }
@@ -14,6 +15,7 @@ type System struct {
 func NewSystem() *System {
 	return &System{
 		mailboxes: make(map[PID]*Mailbox),
+		watchers:  make(map[PID][]PID),
 		counter:   0,
 	}
 }
@@ -55,9 +57,24 @@ func (s *System) Stop(pid PID) {
 	s.mu.Lock()
 	mb := s.mailboxes[pid]
 	delete(s.mailboxes, pid)
+	w := s.watchers[pid]
+	delete(s.watchers, pid)
 	s.mu.Unlock()
+
+	if w != nil {
+		for _, watcher := range w {
+			s.Send(watcher, Terminated{PID: pid})
+		}
+	}
+
 	if mb == nil {
 		return
 	}
 	mb.send(Stopping{})
+}
+
+func (s *System) Watch(watcher, pid PID) {
+	s.mu.Lock()
+	s.watchers[pid] = append(s.watchers[pid], watcher)
+	s.mu.Unlock()
 }

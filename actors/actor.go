@@ -7,6 +7,7 @@ type Actor interface {
 type Context interface {
 	Self() PID
 	Send(to PID, msg any)
+	Watch(pid PID)
 }
 
 type actorContext struct {
@@ -22,6 +23,14 @@ func (c actorContext) Send(to PID, msg any) {
 	c.sys.Send(to, msg)
 }
 
+func (c actorContext) Watch(pid PID) {
+	c.sys.Watch(c.self, pid)
+}
+
 type Started struct{}
 
 type Stopping struct{}
+
+type Terminated struct {
+	PID PID
+}

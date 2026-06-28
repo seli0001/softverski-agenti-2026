@@ -8,7 +8,7 @@ type Mailbox struct {
 
 func NewMailbox(actor Actor, ctx Context) *Mailbox {
 	return &Mailbox{
-		ch:    make(chan any),
+		ch:    make(chan any, 100),
 		ctx:   ctx,
 		actor: actor,
 	}
