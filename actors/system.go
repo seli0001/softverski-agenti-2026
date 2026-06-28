@@ -78,3 +78,12 @@ func (s *System) Watch(watcher, pid PID) {
 	s.watchers[pid] = append(s.watchers[pid], watcher)
 	s.mu.Unlock()
 }
+
+func (s *System) Become(pid PID, behavior func(Context, any)) {
+	s.mu.Lock()
+	mb := s.mailboxes[pid]
+	s.mu.Unlock()
+	if mb != nil {
+		mb.behavior = behavior
+	}
+}

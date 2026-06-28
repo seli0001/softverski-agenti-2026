@@ -8,6 +8,7 @@ type Context interface {
 	Self() PID
 	Send(to PID, msg any)
 	Watch(pid PID)
+	Become(behavior func(Context, any))
 }
 
 type actorContext struct {
@@ -25,6 +26,10 @@ func (c actorContext) Send(to PID, msg any) {
 
 func (c actorContext) Watch(pid PID) {
 	c.sys.Watch(c.self, pid)
+}
+
+func (c actorContext) Become(behavior func(Context, any)) {
+	c.sys.Become(c.self, behavior)
 }
 
 type Started struct{}
