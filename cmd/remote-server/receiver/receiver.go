@@ -15,6 +15,7 @@ func (r *Receiver) Receive(ctx actors.Context, msg any) {
 		fmt.Println(ctx.Self().ID())
 	case remoteserver.HelloWorld:
 		fmt.Printf("Message received: %s\n", mess.Message)
+		ctx.Send(mess.ReplyTo, remoteserver.HelloWorld{Message: "odgovor", ReplyTo: ctx.Self()})
 	}
 }
 
