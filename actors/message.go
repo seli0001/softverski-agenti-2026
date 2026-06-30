@@ -3,9 +3,16 @@ package actors
 type Message = interface{}
 
 type PID struct {
-	id string
+	Id      string
+	Address string
 }
 
 func (p PID) ID() string {
-	return p.id
+	return p.Id
+}
+
+type Envelope struct {
+	Sender    PID
+	Recipient PID
+	Message   Message
 }

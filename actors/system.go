@@ -1,7 +1,9 @@
 package actors
 
 import (
+	"encoding/gob"
 	"fmt"
+	"net"
 	"sync"
 )
 
@@ -10,6 +12,7 @@ type System struct {
 	watchers  map[PID][]PID
 	children  map[PID][]PID
 	parents   map[PID]PID
+	address   string
 	counter   int
 	mu        sync.Mutex
 }
@@ -25,14 +28,50 @@ func NewSystem() *System {
 	}
 }
 
+func NewRemoteSystem(address string) *System {
+	s := &System{
+		mailboxes: make(map[PID]*Mailbox),
+		watchers:  make(map[PID][]PID),
+		counter:   0,
+		children:  make(map[PID][]PID),
+		address:   address,
+		parents:   make(map[PID]PID),
+	}
+	go s.listen()
+	return s
+}
+
+func (s *System) listen() {
+	gob.Register(Envelope{})
+	conn, err := net.Listen("tcp", s.address)
+	if err != nil {
+		panic(err)
+	}
+	for {
+		c, err := conn.Accept()
+		if err != nil {
+			continue
+		}
+		var msg Envelope
+		gob.NewDecoder(c).Decode(&msg)
+		s.mu.Lock()
+		recipient := s.mailboxes[msg.Recipient]
+		s.mu.Unlock()
+		if recipient == nil {
+			continue
+		}
+		recipient.send(msg.Message)
+	}
+}
+
 func (s *System) Spawn(producer func() Actor) PID {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.counter++
 	id := fmt.Sprintf("actor %d", s.counter)
-
 	pid := PID{
-		id: id,
+		Id:      id,
+		Address: s.address,
 	}
 	ac := actorContext{
 		self: pid,
@@ -62,12 +101,33 @@ func (s *System) SpawnChildren(parent PID, producer func() Actor) PID {
 
 func (s *System) Send(pid PID, msg any) {
 	s.mu.Lock()
-	mb := s.mailboxes[pid]
+	var mb *Mailbox
+	if pid.Address == s.address {
+		mb = s.mailboxes[pid]
+	}
 	s.mu.Unlock()
 	if mb == nil {
+		if pid.Address == s.address {
+			return
+		}
+		s.sendRemote(pid, msg)
 		return
 	}
 	mb.send(msg)
+}
+
+func (s *System) sendRemote(pid PID, msg any) {
+	gob.Register(Envelope{})
+	conn, err := net.Dial("tcp", pid.Address)
+	if err != nil {
+		return
+	}
+	defer conn.Close()
+
+	gob.NewEncoder(conn).Encode(Envelope{
+		Recipient: pid,
+		Message:   msg,
+	})
 }
 
 func (s *System) Stop(pid PID) {
