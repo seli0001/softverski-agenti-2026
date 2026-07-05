@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"sync"
+	"time"
 )
 
 type System struct {
@@ -106,7 +107,7 @@ func (s *System) listen() {
 	for {
 		c, err := conn.Accept()
 		if err != nil {
-			continue
+			return
 		}
 		var msg Envelope
 		errD := gob.NewDecoder(c).Decode(&msg)
@@ -127,9 +128,15 @@ func (s *System) listen() {
 
 func (s *System) Spawn(producer func() Actor) PID {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	s.counter++
 	id := fmt.Sprintf("actor %d", s.counter)
+	s.mu.Unlock()
+	return s.spawnLogic(producer, id)
+}
+
+func (s *System) spawnLogic(producer func() Actor, id string) PID {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	pid := PID{
 		Id:      id,
 		Address: s.address,
@@ -149,6 +156,10 @@ func (s *System) Spawn(producer func() Actor) PID {
 	mb.send(Started{})
 
 	return pid
+}
+
+func (s *System) SpawnNamed(producer func() Actor, name string) PID {
+	return s.spawnLogic(producer, name)
 }
 
 func (s *System) SpawnChildren(parent PID, producer func() Actor) PID {
@@ -195,6 +206,13 @@ func (s *System) sendRemote(pid PID, msg any) {
 		Recipient: pid,
 		Message:   msg,
 	})
+}
+
+func (s *System) SendLater(pid PID, msg any, delay time.Duration) {
+	go func() {
+		time.Sleep(delay)
+		s.Send(pid, msg)
+	}()
 }
 
 func (s *System) Stop(pid PID) {
