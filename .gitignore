@@ -5,3 +5,6 @@
 *.exe
 *.out
 /bin/
+certs/
+data/
+scripts/

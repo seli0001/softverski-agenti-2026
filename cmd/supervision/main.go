@@ -9,10 +9,13 @@ import (
 type Parent struct{}
 
 func (p Parent) Receive(ctx actors.Context, msg any) {
-	if _, ok := msg.(actors.Started); ok {
+	switch msg.(type) {
+	case actors.Started:
 		ctx.Spawn(func() actors.Actor { return Child{name: "seli1"} })
 		ctx.Spawn(func() actors.Actor { return Child{name: "seli2"} })
 		fmt.Println("parent started -> new child")
+	case actors.Stopping:
+		fmt.Println("parent stopped")
 	}
 }
 
@@ -21,13 +24,18 @@ type Child struct {
 }
 
 func (c Child) Receive(ctx actors.Context, msg any) {
-	if _, ok := msg.(actors.Started); ok {
+	switch msg.(type) {
+	case actors.Started:
 		fmt.Println(c.name, "is started")
+	case actors.Stopping:
+		fmt.Println(c.name, " stopped")
 	}
 }
 
 func main() {
 	sys := actors.NewSystem()
-	sys.Spawn(func() actors.Actor { return Parent{} })
+	pid := sys.Spawn(func() actors.Actor { return Parent{} })
+	time.Sleep(1 * time.Second)
+	sys.Stop(pid)
 	time.Sleep(1 * time.Second)
 }

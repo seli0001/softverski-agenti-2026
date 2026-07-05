@@ -1,20 +1,25 @@
 package actors
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/gob"
 	"fmt"
 	"net"
+	"os"
 	"sync"
 )
 
 type System struct {
-	mailboxes map[PID]*Mailbox
-	watchers  map[PID][]PID
-	children  map[PID][]PID
-	parents   map[PID]PID
-	address   string
-	counter   int
-	mu        sync.Mutex
+	mailboxes    map[PID]*Mailbox
+	watchers     map[PID][]PID
+	children     map[PID][]PID
+	parents      map[PID]PID
+	serverConfig *tls.Config
+	clientConfig *tls.Config
+	address      string
+	counter      int
+	mu           sync.Mutex
 }
 
 func NewSystem() *System {
@@ -41,9 +46,60 @@ func NewRemoteSystem(address string) *System {
 	return s
 }
 
+func NewRemoteSystemTLS(address string, certFile, keyFile, caFile string) *System {
+	cert, err := tls.LoadX509KeyPair(certFile, keyFile)
+	if err != nil {
+		panic(err)
+	}
+	bytes, err2 := os.ReadFile(caFile)
+	if err2 != nil {
+		panic(err2)
+	}
+
+	caCertPool := x509.NewCertPool()
+	ok := caCertPool.AppendCertsFromPEM(bytes)
+
+	if !ok {
+		panic("failed to parse root certificate")
+	}
+
+	serverConfig := &tls.Config{
+		Certificates: []tls.Certificate{cert},
+		ClientCAs:    caCertPool,
+		ClientAuth:   tls.RequireAndVerifyClientCert,
+	}
+
+	clientConfig := &tls.Config{
+		Certificates: []tls.Certificate{cert},
+		RootCAs:      caCertPool,
+		ServerName:   "actor-node",
+	}
+
+	s := &System{
+		mailboxes:    make(map[PID]*Mailbox),
+		watchers:     make(map[PID][]PID),
+		counter:      0,
+		mu:           sync.Mutex{},
+		children:     make(map[PID][]PID),
+		parents:      make(map[PID]PID),
+		clientConfig: clientConfig,
+		serverConfig: serverConfig,
+		address:      address,
+	}
+	go s.listen()
+	return s
+}
+
 func (s *System) listen() {
 	gob.Register(Envelope{})
-	conn, err := net.Listen("tcp", s.address)
+	var conn net.Listener
+	var err error
+	if s.serverConfig != nil {
+		conn, err = tls.Listen("tcp", s.address, s.serverConfig)
+	} else {
+		conn, err = net.Listen("tcp", s.address)
+
+	}
 	if err != nil {
 		panic(err)
 	}
@@ -53,7 +109,11 @@ func (s *System) listen() {
 			continue
 		}
 		var msg Envelope
-		gob.NewDecoder(c).Decode(&msg)
+		errD := gob.NewDecoder(c).Decode(&msg)
+		if errD != nil {
+			c.Close()
+			continue
+		}
 		s.mu.Lock()
 		recipient := s.mailboxes[msg.Recipient]
 		s.mu.Unlock()
@@ -61,6 +121,7 @@ func (s *System) listen() {
 			continue
 		}
 		recipient.send(msg.Message)
+		c.Close()
 	}
 }
 
@@ -118,7 +179,13 @@ func (s *System) Send(pid PID, msg any) {
 
 func (s *System) sendRemote(pid PID, msg any) {
 	gob.Register(Envelope{})
-	conn, err := net.Dial("tcp", pid.Address)
+	var conn net.Conn
+	var err error
+	if s.clientConfig != nil {
+		conn, err = tls.Dial("tcp", pid.Address, s.clientConfig)
+	} else {
+		conn, err = net.Dial("tcp", pid.Address)
+	}
 	if err != nil {
 		return
 	}
@@ -136,7 +203,13 @@ func (s *System) Stop(pid PID) {
 	delete(s.mailboxes, pid)
 	w := s.watchers[pid]
 	delete(s.watchers, pid)
+	children := s.children[pid]
+	delete(s.children, pid)
+	delete(s.parents, pid)
 	s.mu.Unlock()
+	for _, child := range children {
+		s.Stop(child)
+	}
 
 	if w != nil {
 		for _, watcher := range w {
