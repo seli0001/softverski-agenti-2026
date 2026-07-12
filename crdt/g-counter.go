@@ -12,6 +12,14 @@ func NewGCounter(nodeId string) *GCounter {
 	}
 }
 
+func (g *GCounter) GetState() map[string]int {
+	copyMap := make(map[string]int)
+	for k, v := range g.state {
+		copyMap[k] = v
+	}
+	return copyMap
+}
+
 func (g *GCounter) Increment() {
 	g.state[g.nodeId]++
 }
@@ -26,6 +34,12 @@ func (g *GCounter) Value() int {
 
 func (g *GCounter) Merge(other GCounter) {
 	for k, v := range other.state {
+		g.state[k] = max(g.state[k], v)
+	}
+}
+
+func (g *GCounter) MergeMap(state map[string]int) {
+	for k, v := range state {
 		g.state[k] = max(g.state[k], v)
 	}
 }

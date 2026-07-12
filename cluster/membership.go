@@ -22,6 +22,14 @@ type PingPeers struct{}
 
 type Timeout struct{}
 
+type GetPeers struct {
+	ReplyTo actors.PID
+}
+
+type Peers struct {
+	Addresses []string
+}
+
 func NewMembership(contactAddress string) *Membership {
 	return &Membership{
 		contact: contactAddress,
@@ -219,5 +227,13 @@ func (m *Membership) Receive(ctx actors.Context, msg any) {
 	case Disconnect:
 		delete(m.active, ms.Sender)
 		m.addToPassive(ms.Sender)
+	case GetPeers:
+		var peerList []string
+		for peer := range m.active {
+			peerList = append(peerList, peer)
+		}
+		ctx.Send(ms.ReplyTo, Peers{
+			Addresses: peerList,
+		})
 	}
 }
