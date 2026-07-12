@@ -18,6 +18,11 @@ func main() {
 	gob.Register(cluster.Join{})
 	gob.Register(cluster.PeerList{})
 	gob.Register(cluster.ForwardJoin{})
+	gob.Register(cluster.Ping{})
+	gob.Register(cluster.Pong{})
+	gob.Register(cluster.NeighborRequest{})
+	gob.Register(cluster.NeighborResponse{})
+	gob.Register(cluster.Disconnect{})
 
 	sys := actors.NewRemoteSystem(myAddress)
 
