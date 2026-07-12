@@ -1,5 +1,7 @@
 package cluster
 
+//P2P messages
+
 type Join struct {
 	Address string
 }
@@ -34,4 +36,18 @@ type NeighborResponse struct {
 
 type Disconnect struct {
 	Sender string
+}
+
+//PROVIDER MESSAGES
+
+type Register struct {
+	Address string
+}
+
+type Heartbeat struct {
+	Address string
+}
+
+type Members struct {
+	Addresses []string
 }
